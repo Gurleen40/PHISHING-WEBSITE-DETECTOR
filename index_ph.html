@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Phishing URL Detector</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                max-width: 700px;
+                margin: 40px auto;
+                padding: 0 20px;
+                color: #222;
+            }
+            h1 { margin-bottom: 0; }
+            h2 { margin-top: 4px; font-weight: normal; color: #555; }
+            label {
+                display: block;
+                margin-top: 14px;
+                font-weight: bold;
+            }
+            small { color: #666; font-weight: normal; display: block; }
+            input, select {
+                width: 100%;
+                padding: 6px 8px;
+                margin-top: 4px;
+                box-sizing: border-box;
+            }
+            button {
+                margin-top: 22px;
+                padding: 10px 20px;
+                font-size: 16px;
+                cursor: pointer;
+            }
+            #result {
+                margin-top: 24px;
+                padding: 14px;
+                border-radius: 6px;
+                font-size: 18px;
+                white-space: pre-line;
+            }
+            .phishing { background: #fdecea; color: #b3261e; }
+            .legit { background: #e6f4ea; color: #1e7d34; }
+            .pending { background: #f1f1f1; color: #444; }
+        </style>
+    </head>
+    <body>
+        <h1>Phishing URL Detector</h1>
+        <h2>Predicting whether a URL is phishing using a Random Forest model</h2>
+
+        <form id="phishingForm">
+            <label for="URLLength">URL Length
+                <small>Total number of characters in the URL</small>
+            </label>
+            <input type="number" id="URLLength" min="0" required>
+
+            <label for="DomainLength">Domain Length
+                <small>Number of characters in the domain part of the URL</small>
+            </label>
+            <input type="number" id="DomainLength" min="0" required>
+
+            <label for="IsDomainIP">Is the Domain an IP Address?</label>
+            <select id="IsDomainIP" required>
+                <option value="0">No</option>
+                <option value="1">Yes</option>
+            </select>
+
+            <label for="CharContinuationRate">Char Continuation Rate
+                <small>0-1, how much repeated/continuous characters appear in the URL</small>
+            </label>
+            <input type="number" id="CharContinuationRate" step="any" min="0" max="1" required>
+
+            <label for="TLDLegitimateProb">TLD Legitimate Probability
+                <small>0-1, probability that this Top-Level Domain (e.g. .com, .xyz) is legitimate</small>
+            </label>
+            <input type="number" id="TLDLegitimateProb" step="any" min="0" max="1" required>
+
+            <label for="URLCharProb">URL Character Probability
+                <small>0-1, likelihood score of the character composition of the URL</small>
+            </label>
+            <input type="number" id="URLCharProb" step="any" min="0" max="1" required>
+
+            <label for="TLDLength">TLD Length
+                <small>Number of characters in the Top-Level Domain</small>
+            </label>
+            <input type="number" id="TLDLength" min="0" required>
+
+            <label for="NoOfSubDomain">Number of Subdomains</label>
+            <input type="number" id="NoOfSubDomain" min="0" required>
+
+            <label for="HasObfuscation">Does the URL Contain Obfuscation?</label>
+            <select id="HasObfuscation" required>
+                <option value="0">No</option>
+                <option value="1">Yes</option>
+            </select>
+
+            <label for="NoOfObfuscatedChar">Number of Obfuscated Characters</label>
+            <input type="number" id="NoOfObfuscatedChar" min="0" required>
+
+            <label for="ObfuscationRatio">Obfuscation Ratio (0-1)</label>
+            <input type="number" id="ObfuscationRatio" step="any" min="0" max="1" required>
+
+            <label for="NoOfLettersInURL">Number of Letters in URL</label>
+            <input type="number" id="NoOfLettersInURL" min="0" required>
+
+            <label for="LetterRatioInURL">Letter Ratio in URL (0-1)</label>
+            <input type="number" id="LetterRatioInURL" step="any" min="0" max="1" required>
+
+            <label for="NoOfDegitsInURL">Number of Digits in URL</label>
+            <input type="number" id="NoOfDegitsInURL" min="0" required>
+
+            <label for="DegitRatioInURL">Digit Ratio in URL (0-1)</label>
+            <input type="number" id="DegitRatioInURL" step="any" min="0" max="1" required>
+
+            <label for="NoOfEqualsInURL">Number of '=' in URL</label>
+            <input type="number" id="NoOfEqualsInURL" min="0" required>
+
+            <label for="NoOfQMarkInURL">Number of '?' in URL</label>
+            <input type="number" id="NoOfQMarkInURL" min="0" required>
+
+            <label for="NoOfAmpersandInURL">Number of '&' in URL</label>
+            <input type="number" id="NoOfAmpersandInURL" min="0" required>
+
+            <label for="NoOfOtherSpecialCharsInURL">Number of Other Special Characters in URL</label>
+            <input type="number" id="NoOfOtherSpecialCharsInURL" min="0" required>
+
+            <label for="SpacialCharRatioInURL">Special Character Ratio in URL (0-1)</label>
+            <input type="number" id="SpacialCharRatioInURL" step="any" min="0" max="1" required>
+
+            <button type="submit">Check URL</button>
+        </form>
+
+        <div id="result"></div>
+
+        <script>
+            const BACKEND_URL = "https://YOUR-BACKEND-URL.onrender.com"; // TODO: replace with your deployed backend URL
+
+            const FIELD_IDS = [
+                "URLLength", "DomainLength", "IsDomainIP", "CharContinuationRate",
+                "TLDLegitimateProb", "URLCharProb", "TLDLength", "NoOfSubDomain",
+                "HasObfuscation", "NoOfObfuscatedChar", "ObfuscationRatio",
+                "NoOfLettersInURL", "LetterRatioInURL", "NoOfDegitsInURL",
+                "DegitRatioInURL", "NoOfEqualsInURL", "NoOfQMarkInURL",
+                "NoOfAmpersandInURL", "NoOfOtherSpecialCharsInURL", "SpacialCharRatioInURL"
+            ];
+
+            // Wake up the backend as soon as the page loads (Render free-tier apps sleep when idle)
+            window.addEventListener("load", () => {
+                fetch(BACKEND_URL)
+                    .then(() => console.log("Backend warmed up"))
+                    .catch(error => console.log("Backend warm-up:", error));
+            });
+
+            document.getElementById("phishingForm").addEventListener("submit", function (event) {
+                event.preventDefault();
+
+                const resultDiv = document.getElementById("result");
+                resultDiv.className = "pending";
+                resultDiv.innerText = "Checking... this may take up to a minute if the server was idle.";
+
+                const payload = {};
+                FIELD_IDS.forEach(id => {
+                    payload[id] = document.getElementById(id).value;
+                });
+
+                fetch(BACKEND_URL + "/predict", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            resultDiv.className = "pending";
+                            resultDiv.innerText = "Error: " + data.error;
+                            return;
+                        }
+
+                        const isPhishing = data.Prediction_Label === 0;
+                        resultDiv.className = isPhishing ? "phishing" : "legit";
+
+                        let text = "Prediction: " + data.Prediction;
+                        if (data.Probability) {
+                            const confidence = (Math.max(...data.Probability) * 100).toFixed(2);
+                            text += "\nConfidence: " + confidence + "%";
+                        }
+                        resultDiv.innerText = text;
+                    })
+                    .catch(error => {
+                        console.error("Error:", error);
+                        resultDiv.className = "pending";
+                        resultDiv.innerText = "Something went wrong.";
+                    });
+            });
+        </script>
+    </body>
+</html>
