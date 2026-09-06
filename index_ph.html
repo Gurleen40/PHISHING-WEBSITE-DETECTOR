@@ -1,195 +1,250 @@
 <!DOCTYPE html>
-<html>
-    <head>
-        <title>Phishing URL Detector</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                max-width: 700px;
-                margin: 40px auto;
-                padding: 0 20px;
-                color: #222;
-            }
-            h1 { margin-bottom: 0; }
-            h2 { margin-top: 4px; font-weight: normal; color: #555; }
-            label {
-                display: block;
-                margin-top: 14px;
-                font-weight: bold;
-            }
-            small { color: #666; font-weight: normal; display: block; }
-            input, select {
-                width: 100%;
-                padding: 6px 8px;
-                margin-top: 4px;
-                box-sizing: border-box;
-            }
-            button {
-                margin-top: 22px;
-                padding: 10px 20px;
-                font-size: 16px;
-                cursor: pointer;
-            }
-            #result {
-                margin-top: 24px;
-                padding: 14px;
-                border-radius: 6px;
-                font-size: 18px;
-                white-space: pre-line;
-            }
-            .phishing { background: #fdecea; color: #b3261e; }
-            .legit { background: #e6f4ea; color: #1e7d34; }
-            .pending { background: #f1f1f1; color: #444; }
-        </style>
-    </head>
-    <body>
-        <h1>Phishing URL Detector</h1>
-        <h2>Predicting whether a URL is phishing using a Random Forest model</h2>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phishing Model Tester</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --border: #2a2e38;
+    --text: #e6e8ec;
+    --muted: #8b8f9a;
+    --accent: #4f8cff;
+    --good: #2fbf71;
+    --bad: #e05a5a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 32px 16px 80px;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .panel h2 { font-size: 14px; text-transform: none; margin: 0 0 14px; color: var(--muted); font-weight: 600; }
+  label { display: block; font-size: 13px; margin-bottom: 4px; color: var(--text); }
+  .hint { color: var(--muted); font-size: 11px; margin-top: 2px; }
+  input[type="text"], input[type="number"] {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: #0d0f13;
+    color: var(--text);
+    font-size: 14px;
+  }
+  input:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
+  .field { margin-bottom: 0; }
+  .binary-row { display: flex; align-items: center; gap: 8px; }
+  .binary-row input[type="checkbox"] { width: 16px; height: 16px; }
+  button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 12px 20px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+  }
+  button:hover { opacity: 0.9; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  #result {
+    margin-top: 20px;
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    display: none;
+  }
+  #result.legit { border-color: var(--good); background: rgba(47,191,113,0.08); }
+  #result.phish { border-color: var(--bad); background: rgba(224,90,90,0.08); }
+  #result.err { border-color: var(--bad); background: rgba(224,90,90,0.08); }
+  #result .label { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+  #result .detail { font-size: 13px; color: var(--muted); white-space: pre-wrap; word-break: break-all; }
+  .field-error input { border-color: var(--bad); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Phishing Model Tester</h1>
+  <div class="sub">Sends the 20 raw feature values straight to your <code>/predict</code> endpoint — for verifying the model + API, not for scoring real URLs (nothing here extracts features from a URL).</div>
 
-        <form id="phishingForm">
-            <label for="URLLength">URL Length
-                <small>Total number of characters in the URL</small>
-            </label>
-            <input type="number" id="URLLength" min="0" required>
+  <div class="panel">
+    <h2>API endpoint</h2>
+    <input type="text" id="apiUrl" value="http://localhost:5000/predict" />
+    <div class="hint">Your Flask server's /predict URL. If it's running elsewhere, change this.</div>
+  </div>
 
-            <label for="DomainLength">Domain Length
-                <small>Number of characters in the domain part of the URL</small>
-            </label>
-            <input type="number" id="DomainLength" min="0" required>
+  <form id="featureForm">
+    <div class="panel">
+      <h2>URL structure</h2>
+      <div class="grid">
+        <div class="field"><label>URLLength</label><input type="number" step="any" data-key="URLLength" required></div>
+        <div class="field"><label>DomainLength</label><input type="number" step="any" data-key="DomainLength" required></div>
+        <div class="field"><label>TLDLength</label><input type="number" step="any" data-key="TLDLength" required></div>
+        <div class="field"><label>NoOfSubDomain</label><input type="number" step="any" data-key="NoOfSubDomain" required></div>
+      </div>
+    </div>
 
-            <label for="IsDomainIP">Is the Domain an IP Address?</label>
-            <select id="IsDomainIP" required>
-                <option value="0">No</option>
-                <option value="1">Yes</option>
-            </select>
+    <div class="panel">
+      <h2>Trained-dataset statistics</h2>
+      <div class="grid">
+        <div class="field">
+          <label>TLDLegitimateProb</label>
+          <input type="number" step="any" min="0" max="1" data-key="TLDLegitimateProb" required>
+          <div class="hint">0–1, from training-set TLD stats</div>
+        </div>
+        <div class="field">
+          <label>URLCharProb</label>
+          <input type="number" step="any" min="0" max="1" data-key="URLCharProb" required>
+          <div class="hint">0–1, from training-set char-frequency model</div>
+        </div>
+        <div class="field">
+          <label>CharContinuationRate</label>
+          <input type="number" step="any" min="0" max="1" data-key="CharContinuationRate" required>
+        </div>
+      </div>
+    </div>
 
-            <label for="CharContinuationRate">Char Continuation Rate
-                <small>0-1, how much repeated/continuous characters appear in the URL</small>
-            </label>
-            <input type="number" id="CharContinuationRate" step="any" min="0" max="1" required>
+    <div class="panel">
+      <h2>Character composition</h2>
+      <div class="grid">
+        <div class="field"><label>NoOfLettersInURL</label><input type="number" step="any" data-key="NoOfLettersInURL" required></div>
+        <div class="field"><label>LetterRatioInURL</label><input type="number" step="any" min="0" max="1" data-key="LetterRatioInURL" required></div>
+        <div class="field"><label>NoOfDegitsInURL</label><input type="number" step="any" data-key="NoOfDegitsInURL" required></div>
+        <div class="field"><label>DegitRatioInURL</label><input type="number" step="any" min="0" max="1" data-key="DegitRatioInURL" required></div>
+        <div class="field"><label>NoOfEqualsInURL</label><input type="number" step="any" data-key="NoOfEqualsInURL" required></div>
+        <div class="field"><label>NoOfQMarkInURL</label><input type="number" step="any" data-key="NoOfQMarkInURL" required></div>
+        <div class="field"><label>NoOfAmpersandInURL</label><input type="number" step="any" data-key="NoOfAmpersandInURL" required></div>
+        <div class="field"><label>NoOfOtherSpecialCharsInURL</label><input type="number" step="any" data-key="NoOfOtherSpecialCharsInURL" required></div>
+        <div class="field"><label>SpacialCharRatioInURL</label><input type="number" step="any" min="0" max="1" data-key="SpacialCharRatioInURL" required></div>
+      </div>
+    </div>
 
-            <label for="TLDLegitimateProb">TLD Legitimate Probability
-                <small>0-1, probability that this Top-Level Domain (e.g. .com, .xyz) is legitimate</small>
-            </label>
-            <input type="number" id="TLDLegitimateProb" step="any" min="0" max="1" required>
+    <div class="panel">
+      <h2>Obfuscation &amp; flags</h2>
+      <div class="grid">
+        <div class="field"><label>NoOfObfuscatedChar</label><input type="number" step="any" data-key="NoOfObfuscatedChar" required></div>
+        <div class="field"><label>ObfuscationRatio</label><input type="number" step="any" min="0" max="1" data-key="ObfuscationRatio" required></div>
+        <div class="field binary-row">
+          <input type="checkbox" id="IsDomainIP" data-key="IsDomainIP">
+          <label for="IsDomainIP" style="margin:0;">IsDomainIP</label>
+        </div>
+        <div class="field binary-row">
+          <input type="checkbox" id="HasObfuscation" data-key="HasObfuscation">
+          <label for="HasObfuscation" style="margin:0;">HasObfuscation</label>
+        </div>
+      </div>
+    </div>
 
-            <label for="URLCharProb">URL Character Probability
-                <small>0-1, likelihood score of the character composition of the URL</small>
-            </label>
-            <input type="number" id="URLCharProb" step="any" min="0" max="1" required>
+    <button type="submit" id="submitBtn">Run prediction</button>
+  </form>
 
-            <label for="TLDLength">TLD Length
-                <small>Number of characters in the Top-Level Domain</small>
-            </label>
-            <input type="number" id="TLDLength" min="0" required>
+  <div id="result"></div>
+</div>
 
-            <label for="NoOfSubDomain">Number of Subdomains</label>
-            <input type="number" id="NoOfSubDomain" min="0" required>
+<script>
+const FEATURE_ORDER = [
+  "URLLength", "DomainLength", "IsDomainIP", "CharContinuationRate",
+  "TLDLegitimateProb", "URLCharProb", "TLDLength", "NoOfSubDomain",
+  "HasObfuscation", "NoOfObfuscatedChar", "ObfuscationRatio",
+  "NoOfLettersInURL", "LetterRatioInURL", "NoOfDegitsInURL", "DegitRatioInURL",
+  "NoOfEqualsInURL", "NoOfQMarkInURL", "NoOfAmpersandInURL",
+  "NoOfOtherSpecialCharsInURL", "SpacialCharRatioInURL"
+];
+const BINARY_KEYS = new Set(["IsDomainIP", "HasObfuscation"]);
 
-            <label for="HasObfuscation">Does the URL Contain Obfuscation?</label>
-            <select id="HasObfuscation" required>
-                <option value="0">No</option>
-                <option value="1">Yes</option>
-            </select>
+const form = document.getElementById("featureForm");
+const resultBox = document.getElementById("result");
+const submitBtn = document.getElementById("submitBtn");
 
-            <label for="NoOfObfuscatedChar">Number of Obfuscated Characters</label>
-            <input type="number" id="NoOfObfuscatedChar" min="0" required>
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
 
-            <label for="ObfuscationRatio">Obfuscation Ratio (0-1)</label>
-            <input type="number" id="ObfuscationRatio" step="any" min="0" max="1" required>
+  const payload = {};
+  let valid = true;
 
-            <label for="NoOfLettersInURL">Number of Letters in URL</label>
-            <input type="number" id="NoOfLettersInURL" min="0" required>
+  for (const key of FEATURE_ORDER) {
+    const el = form.querySelector(`[data-key="${key}"]`);
+    el.parentElement.classList.remove("field-error");
+    if (BINARY_KEYS.has(key)) {
+      payload[key] = el.checked ? 1 : 0;
+    } else {
+      if (el.value === "" || isNaN(Number(el.value))) {
+        el.parentElement.classList.add("field-error");
+        valid = false;
+      }
+      payload[key] = Number(el.value);
+    }
+  }
 
-            <label for="LetterRatioInURL">Letter Ratio in URL (0-1)</label>
-            <input type="number" id="LetterRatioInURL" step="any" min="0" max="1" required>
+  if (!valid) {
+    showResult("err", "Missing values", "Please fill in every highlighted field.");
+    return;
+  }
 
-            <label for="NoOfDegitsInURL">Number of Digits in URL</label>
-            <input type="number" id="NoOfDegitsInURL" min="0" required>
+  const apiUrl = document.getElementById("apiUrl").value.trim();
+  if (!apiUrl) {
+    showResult("err", "Missing API URL", "Enter your Flask server's /predict URL above.");
+    return;
+  }
 
-            <label for="DegitRatioInURL">Digit Ratio in URL (0-1)</label>
-            <input type="number" id="DegitRatioInURL" step="any" min="0" max="1" required>
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Running...";
 
-            <label for="NoOfEqualsInURL">Number of '=' in URL</label>
-            <input type="number" id="NoOfEqualsInURL" min="0" required>
+  try {
+    const res = await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
 
-            <label for="NoOfQMarkInURL">Number of '?' in URL</label>
-            <input type="number" id="NoOfQMarkInURL" min="0" required>
+    const data = await res.json();
 
-            <label for="NoOfAmpersandInURL">Number of '&' in URL</label>
-            <input type="number" id="NoOfAmpersandInURL" min="0" required>
+    if (!res.ok) {
+      showResult("err", `Server error (${res.status})`, JSON.stringify(data, null, 2));
+    } else {
+      const cls = data.Prediction === "Legitimate" ? "legit" : "phish";
+      let detail = `Prediction_Label: ${data.Prediction_Label}`;
+      if (data.Probability) {
+        detail += `\nProbability: [phishing: ${data.Probability[0]?.toFixed(4)}, legitimate: ${data.Probability[1]?.toFixed(4)}]`;
+      }
+      detail += `\n\nSent payload:\n${JSON.stringify(payload, null, 2)}`;
+      showResult(cls, data.Prediction, detail);
+    }
+  } catch (err) {
+    showResult(
+      "err",
+      "Request failed",
+      `Could not reach ${apiUrl}.\n\nCommon causes:\n- Flask server isn't running\n- Wrong URL/port\n- CORS not enabled (check flask_cors is active)\n\nDetails: ${err.message}`
+    );
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Run prediction";
+  }
+});
 
-            <label for="NoOfOtherSpecialCharsInURL">Number of Other Special Characters in URL</label>
-            <input type="number" id="NoOfOtherSpecialCharsInURL" min="0" required>
-
-            <label for="SpacialCharRatioInURL">Special Character Ratio in URL (0-1)</label>
-            <input type="number" id="SpacialCharRatioInURL" step="any" min="0" max="1" required>
-
-            <button type="submit">Check URL</button>
-        </form>
-
-        <div id="result"></div>
-
-        <script>
-            const BACKEND_URL = "https://phishing-website-detector-osbl.onrender.com"; // TODO: replace with your deployed backend URL
-
-            const FIELD_IDS = [
-                "URLLength", "DomainLength", "IsDomainIP", "CharContinuationRate",
-                "TLDLegitimateProb", "URLCharProb", "TLDLength", "NoOfSubDomain",
-                "HasObfuscation", "NoOfObfuscatedChar", "ObfuscationRatio",
-                "NoOfLettersInURL", "LetterRatioInURL", "NoOfDegitsInURL",
-                "DegitRatioInURL", "NoOfEqualsInURL", "NoOfQMarkInURL",
-                "NoOfAmpersandInURL", "NoOfOtherSpecialCharsInURL", "SpacialCharRatioInURL"
-            ];
-
-            // Wake up the backend as soon as the page loads (Render free-tier apps sleep when idle)
-            window.addEventListener("load", () => {
-                fetch(BACKEND_URL)
-                    .then(() => console.log("Backend warmed up"))
-                    .catch(error => console.log("Backend warm-up:", error));
-            });
-
-            document.getElementById("phishingForm").addEventListener("submit", function (event) {
-                event.preventDefault();
-
-                const resultDiv = document.getElementById("result");
-                resultDiv.className = "pending";
-                resultDiv.innerText = "Checking... this may take up to a minute if the server was idle.";
-
-                const payload = {};
-                FIELD_IDS.forEach(id => {
-                    payload[id] = document.getElementById(id).value;
-                });
-
-                fetch(BACKEND_URL + "/predict", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.error) {
-                            resultDiv.className = "pending";
-                            resultDiv.innerText = "Error: " + data.error;
-                            return;
-                        }
-
-                        const isPhishing = data.Prediction_Label === 0;
-                        resultDiv.className = isPhishing ? "phishing" : "legit";
-
-                        let text = "Prediction: " + data.Prediction;
-                        if (data.Probability) {
-                            const confidence = (Math.max(...data.Probability) * 100).toFixed(2);
-                            text += "\nConfidence: " + confidence + "%";
-                        }
-                        resultDiv.innerText = text;
-                    })
-                    .catch(error => {
-                        console.error("Error:", error);
-                        resultDiv.className = "pending";
-                        resultDiv.innerText = "Something went wrong.";
-                    });
-            });
-        </script>
-    </body>
+function showResult(cls, label, detail) {
+  resultBox.className = cls;
+  resultBox.style.display = "block";
+  resultBox.innerHTML = `<div class="label">${label}</div><div class="detail"></div>`;
+  resultBox.querySelector(".detail").textContent = detail;
+  resultBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+</script>
+</body>
 </html>
