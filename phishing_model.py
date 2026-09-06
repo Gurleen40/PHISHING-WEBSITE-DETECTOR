@@ -5,7 +5,7 @@ from flask_cors import CORS
 import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-model_path = os.path.join(BASE_DIR, "Random_Forest.pk")
+model_path = os.path.join(BASE_DIR, "Random_Forest_medium.pk")
 scaler_path = os.path.join(BASE_DIR, "scaler.pk")
 
 with open(model_path, "rb") as file:
