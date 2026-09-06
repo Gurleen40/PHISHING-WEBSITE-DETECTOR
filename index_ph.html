@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Phishing Model Tester</title>
+<title>Phishing URL Checker</title>
 <style>
   :root {
     --bg: #0f1115;
@@ -18,232 +18,145 @@
   * { box-sizing: border-box; }
   body {
     margin: 0;
+    min-height: 100vh;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     background: var(--bg);
     color: var(--text);
-    padding: 32px 16px 80px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 60px 16px;
   }
-  .wrap { max-width: 720px; margin: 0 auto; }
-  h1 { font-size: 22px; margin-bottom: 4px; }
-  .sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
-  .panel {
+  .wrap { max-width: 560px; width: 100%; }
+  h1 { font-size: 24px; margin-bottom: 6px; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+  form { display: flex; gap: 8px; margin-bottom: 20px; }
+  input[type="text"] {
+    flex: 1;
+    padding: 14px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
     background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 20px;
-    margin-bottom: 20px;
-  }
-  .panel h2 { font-size: 14px; text-transform: none; margin: 0 0 14px; color: var(--muted); font-weight: 600; }
-  label { display: block; font-size: 13px; margin-bottom: 4px; color: var(--text); }
-  .hint { color: var(--muted); font-size: 11px; margin-top: 2px; }
-  input[type="text"], input[type="number"] {
-    width: 100%;
-    padding: 8px 10px;
-    border-radius: 6px;
-    border: 1px solid var(--border);
-    background: #0d0f13;
     color: var(--text);
-    font-size: 14px;
+    font-size: 15px;
   }
-  input:focus { outline: 2px solid var(--accent); border-color: transparent; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
-  .field { margin-bottom: 0; }
-  .binary-row { display: flex; align-items: center; gap: 8px; }
-  .binary-row input[type="checkbox"] { width: 16px; height: 16px; }
+  input[type="text"]:focus { outline: 2px solid var(--accent); border-color: transparent; }
   button {
     background: var(--accent);
     color: white;
     border: none;
-    border-radius: 6px;
-    padding: 12px 20px;
+    border-radius: 8px;
+    padding: 0 22px;
     font-size: 15px;
     font-weight: 600;
     cursor: pointer;
-    width: 100%;
   }
   button:hover { opacity: 0.9; }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
   #result {
-    margin-top: 20px;
-    padding: 16px;
-    border-radius: 8px;
+    padding: 20px;
+    border-radius: 10px;
     border: 1px solid var(--border);
     display: none;
   }
   #result.legit { border-color: var(--good); background: rgba(47,191,113,0.08); }
   #result.phish { border-color: var(--bad); background: rgba(224,90,90,0.08); }
   #result.err { border-color: var(--bad); background: rgba(224,90,90,0.08); }
-  #result .label { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
-  #result .detail { font-size: 13px; color: var(--muted); white-space: pre-wrap; word-break: break-all; }
-  .field-error input { border-color: var(--bad); }
+  #result .label { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  #result .conf { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  #result .msg { font-size: 13px; color: var(--muted); }
+  details { margin-top: 12px; }
+  summary { cursor: pointer; font-size: 12px; color: var(--muted); }
+  pre {
+    font-size: 11px;
+    color: var(--muted);
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin-top: 8px;
+  }
+  .settings { margin-top: 32px; font-size: 12px; color: var(--muted); }
+  .settings input {
+    width: 100%;
+    margin-top: 6px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: #0d0f13;
+    color: var(--text);
+    font-size: 12px;
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Phishing Model Tester</h1>
-  <div class="sub">Sends the 20 raw feature values straight to your <code>/predict</code> endpoint — for verifying the model + API, not for scoring real URLs (nothing here extracts features from a URL).</div>
+  <h1>Phishing URL Checker</h1>
+  <div class="sub">Paste a URL — features are computed server-side and passed straight to the Random Forest model.</div>
 
-  <div class="panel">
-    <h2>API endpoint</h2>
-    <input type="text" id="apiUrl" value="https://phishing-website-detector-osbl.onrender.com/predict" />
-    <div class="hint">Your Flask server's /predict URL. If it's running elsewhere, change this.</div>
-  </div>
-
-  <form id="featureForm">
-    <div class="panel">
-      <h2>URL structure</h2>
-      <div class="grid">
-        <div class="field"><label>URLLength</label><input type="number" step="any" data-key="URLLength" required></div>
-        <div class="field"><label>DomainLength</label><input type="number" step="any" data-key="DomainLength" required></div>
-        <div class="field"><label>TLDLength</label><input type="number" step="any" data-key="TLDLength" required></div>
-        <div class="field"><label>NoOfSubDomain</label><input type="number" step="any" data-key="NoOfSubDomain" required></div>
-      </div>
-    </div>
-
-    <div class="panel">
-      <h2>Trained-dataset statistics</h2>
-      <div class="grid">
-        <div class="field">
-          <label>TLDLegitimateProb</label>
-          <input type="number" step="any" min="0" max="1" data-key="TLDLegitimateProb" required>
-          <div class="hint">0–1, from training-set TLD stats</div>
-        </div>
-        <div class="field">
-          <label>URLCharProb</label>
-          <input type="number" step="any" min="0" max="1" data-key="URLCharProb" required>
-          <div class="hint">0–1, from training-set char-frequency model</div>
-        </div>
-        <div class="field">
-          <label>CharContinuationRate</label>
-          <input type="number" step="any" min="0" max="1" data-key="CharContinuationRate" required>
-        </div>
-      </div>
-    </div>
-
-    <div class="panel">
-      <h2>Character composition</h2>
-      <div class="grid">
-        <div class="field"><label>NoOfLettersInURL</label><input type="number" step="any" data-key="NoOfLettersInURL" required></div>
-        <div class="field"><label>LetterRatioInURL</label><input type="number" step="any" min="0" max="1" data-key="LetterRatioInURL" required></div>
-        <div class="field"><label>NoOfDegitsInURL</label><input type="number" step="any" data-key="NoOfDegitsInURL" required></div>
-        <div class="field"><label>DegitRatioInURL</label><input type="number" step="any" min="0" max="1" data-key="DegitRatioInURL" required></div>
-        <div class="field"><label>NoOfEqualsInURL</label><input type="number" step="any" data-key="NoOfEqualsInURL" required></div>
-        <div class="field"><label>NoOfQMarkInURL</label><input type="number" step="any" data-key="NoOfQMarkInURL" required></div>
-        <div class="field"><label>NoOfAmpersandInURL</label><input type="number" step="any" data-key="NoOfAmpersandInURL" required></div>
-        <div class="field"><label>NoOfOtherSpecialCharsInURL</label><input type="number" step="any" data-key="NoOfOtherSpecialCharsInURL" required></div>
-        <div class="field"><label>SpacialCharRatioInURL</label><input type="number" step="any" min="0" max="1" data-key="SpacialCharRatioInURL" required></div>
-      </div>
-    </div>
-
-    <div class="panel">
-      <h2>Obfuscation &amp; flags</h2>
-      <div class="grid">
-        <div class="field"><label>NoOfObfuscatedChar</label><input type="number" step="any" data-key="NoOfObfuscatedChar" required></div>
-        <div class="field"><label>ObfuscationRatio</label><input type="number" step="any" min="0" max="1" data-key="ObfuscationRatio" required></div>
-        <div class="field binary-row">
-          <input type="checkbox" id="IsDomainIP" data-key="IsDomainIP">
-          <label for="IsDomainIP" style="margin:0;">IsDomainIP</label>
-        </div>
-        <div class="field binary-row">
-          <input type="checkbox" id="HasObfuscation" data-key="HasObfuscation">
-          <label for="HasObfuscation" style="margin:0;">HasObfuscation</label>
-        </div>
-      </div>
-    </div>
-
-    <button type="submit" id="submitBtn">Run prediction</button>
+  <form id="urlForm">
+    <input type="text" id="urlInput" placeholder="https://example.com" required>
+    <button type="submit" id="submitBtn">Check</button>
   </form>
 
   <div id="result"></div>
+
+  <div class="settings">
+    <label for="apiUrl">API endpoint</label>
+    <input type="text" id="apiUrl" value="https://phishing-website-detector-osbl.onrender.com/predict">
+  </div>
 </div>
 
 <script>
-const FEATURE_ORDER = [
-  "URLLength", "DomainLength", "IsDomainIP", "CharContinuationRate",
-  "TLDLegitimateProb", "URLCharProb", "TLDLength", "NoOfSubDomain",
-  "HasObfuscation", "NoOfObfuscatedChar", "ObfuscationRatio",
-  "NoOfLettersInURL", "LetterRatioInURL", "NoOfDegitsInURL", "DegitRatioInURL",
-  "NoOfEqualsInURL", "NoOfQMarkInURL", "NoOfAmpersandInURL",
-  "NoOfOtherSpecialCharsInURL", "SpacialCharRatioInURL"
-];
-const BINARY_KEYS = new Set(["IsDomainIP", "HasObfuscation"]);
-
-const form = document.getElementById("featureForm");
+const form = document.getElementById("urlForm");
 const resultBox = document.getElementById("result");
 const submitBtn = document.getElementById("submitBtn");
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
 
-  const payload = {};
-  let valid = true;
-
-  for (const key of FEATURE_ORDER) {
-    const el = form.querySelector(`[data-key="${key}"]`);
-    el.parentElement.classList.remove("field-error");
-    if (BINARY_KEYS.has(key)) {
-      payload[key] = el.checked ? 1 : 0;
-    } else {
-      if (el.value === "" || isNaN(Number(el.value))) {
-        el.parentElement.classList.add("field-error");
-        valid = false;
-      }
-      payload[key] = Number(el.value);
-    }
-  }
-
-  if (!valid) {
-    showResult("err", "Missing values", "Please fill in every highlighted field.");
-    return;
-  }
-
+  const url = document.getElementById("urlInput").value.trim();
   const apiUrl = document.getElementById("apiUrl").value.trim();
-  if (!apiUrl) {
-    showResult("err", "Missing API URL", "Enter your Flask server's /predict URL above.");
-    return;
-  }
+  if (!url || !apiUrl) return;
 
   submitBtn.disabled = true;
-  submitBtn.textContent = "Running...";
+  submitBtn.textContent = "Checking...";
 
   try {
     const res = await fetch(apiUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ url })
     });
-
     const data = await res.json();
 
     if (!res.ok) {
-      showResult("err", `Server error (${res.status})`, JSON.stringify(data, null, 2));
+      showResult("err", "Server error", data.error || JSON.stringify(data), null);
     } else {
       const cls = data.Prediction === "Legitimate" ? "legit" : "phish";
-      let detail = `Prediction_Label: ${data.Prediction_Label}`;
+      let conf = "";
       if (data.Probability) {
-        detail += `\nProbability: [phishing: ${data.Probability[0]?.toFixed(4)}, legitimate: ${data.Probability[1]?.toFixed(4)}]`;
+        const pct = (Math.max(...data.Probability) * 100).toFixed(1);
+        conf = `${pct}% confidence`;
       }
-      detail += `\n\nSent payload:\n${JSON.stringify(payload, null, 2)}`;
-      showResult(cls, data.Prediction, detail);
+      showResult(cls, data.Prediction, conf, data.features_used);
     }
   } catch (err) {
-    showResult(
-      "err",
-      "Request failed",
-      `Could not reach ${apiUrl}.\n\nCommon causes:\n- Flask server isn't running\n- Wrong URL/port\n- CORS not enabled (check flask_cors is active)\n\nDetails: ${err.message}`
-    );
+    showResult("err", "Request failed", `Could not reach the API. ${err.message}`, null);
   } finally {
     submitBtn.disabled = false;
-    submitBtn.textContent = "Run prediction";
+    submitBtn.textContent = "Check";
   }
 });
 
-function showResult(cls, label, detail) {
+function showResult(cls, label, sub, featuresUsed) {
   resultBox.className = cls;
   resultBox.style.display = "block";
-  resultBox.innerHTML = `<div class="label">${label}</div><div class="detail"></div>`;
-  resultBox.querySelector(".detail").textContent = detail;
-  resultBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  let html = `<div class="label">${label}</div>`;
+  if (sub) html += `<div class="conf">${sub}</div>`;
+  if (!featuresUsed) html += `<div class="msg">${sub && cls === "err" ? "" : ""}</div>`;
+  if (featuresUsed) {
+    html += `<details><summary>Computed feature values</summary><pre>${JSON.stringify(featuresUsed, null, 2)}</pre></details>`;
+  }
+  resultBox.innerHTML = html;
 }
 </script>
 </body>
